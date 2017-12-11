@@ -22,18 +22,18 @@ func CategoryShow(env *config.Env) http.Handler {
 }
 
 func CategoryCreate(env *config.Env) http.Handler {
-	return webutil.CreateRecord(env, Category{}, func(db *sql.DB, data []byte) (interface{}, error) {
-		category := Category{}
-		json.Unmarshal(data, &category)
-		return CreateCategory(db, category)
+	return webutil.CreateRecord(env, Category{}, func(db *sql.DB, byteData []byte) (interface{}, error) {
+		data := Category{}
+		json.Unmarshal(byteData, &data)
+		return CreateCategory(db, data)
 	})
 }
 
 func CategoryUpdate(env *config.Env) http.Handler {
-	return webutil.UpdateRecord(env, Category{}, func(db *sql.DB, id interface{}, data []byte) (interface{}, error) {
-		category := Category{}
-		json.Unmarshal(data, &category)
-		return UpdateCategory(db, id.(int), category)
+	return webutil.UpdateRecord(env, Category{}, func(db *sql.DB, id interface{}, byteData []byte) (interface{}, error) {
+		data := Category{}
+		json.Unmarshal(byteData, &data)
+		return UpdateCategory(db, id.(int), data)
 	})
 }
 
