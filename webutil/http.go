@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
+	"github.com/jmoiron/sqlx"
 	"github.com/kyawthanttin/bpi-wms/config"
 )
 
@@ -32,7 +33,7 @@ func RespondWithErrorType(w http.ResponseWriter, err error) {
 	}
 }
 
-func ListRecords(env *config.Env, listFunc func(*sql.DB, interface{}) (interface{}, error)) http.Handler {
+func ListRecords(env *config.Env, listFunc func(*sqlx.DB, interface{}) (interface{}, error)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
 			RespondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
@@ -47,7 +48,7 @@ func ListRecords(env *config.Env, listFunc func(*sql.DB, interface{}) (interface
 	})
 }
 
-func GetRecord(env *config.Env, getFunc func(*sql.DB, interface{}) (interface{}, error)) http.Handler {
+func GetRecord(env *config.Env, getFunc func(*sqlx.DB, interface{}) (interface{}, error)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
 			RespondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
@@ -69,7 +70,7 @@ func GetRecord(env *config.Env, getFunc func(*sql.DB, interface{}) (interface{},
 	})
 }
 
-func CreateRecord(env *config.Env, data interface{}, createFunc func(*sql.DB, []byte) (interface{}, error)) http.Handler {
+func CreateRecord(env *config.Env, data interface{}, createFunc func(*sqlx.DB, []byte) (interface{}, error)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			RespondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
@@ -91,7 +92,7 @@ func CreateRecord(env *config.Env, data interface{}, createFunc func(*sql.DB, []
 	})
 }
 
-func UpdateRecord(env *config.Env, data interface{}, updateFunc func(*sql.DB, interface{}, []byte) (interface{}, error)) http.Handler {
+func UpdateRecord(env *config.Env, data interface{}, updateFunc func(*sqlx.DB, interface{}, []byte) (interface{}, error)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "PUT" {
 			RespondWithError(w, http.StatusBadRequest, "Method Not Allowed")
@@ -119,7 +120,7 @@ func UpdateRecord(env *config.Env, data interface{}, updateFunc func(*sql.DB, in
 	})
 }
 
-func DeleteRecord(env *config.Env, deleteFunc func(*sql.DB, interface{}) error) http.Handler {
+func DeleteRecord(env *config.Env, deleteFunc func(*sqlx.DB, interface{}) error) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "DELETE" {
 			RespondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")

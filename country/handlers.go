@@ -1,28 +1,28 @@
 package country
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/kyawthanttin/bpi-wms/config"
 	"github.com/kyawthanttin/bpi-wms/webutil"
 )
 
 func CountryList(env *config.Env) http.Handler {
-	return webutil.ListRecords(env, func(db *sql.DB, search interface{}) (interface{}, error) {
+	return webutil.ListRecords(env, func(db *sqlx.DB, search interface{}) (interface{}, error) {
 		return ListCountries(db, search.(string))
 	})
 }
 
 func CountryShow(env *config.Env) http.Handler {
-	return webutil.GetRecord(env, func(db *sql.DB, id interface{}) (interface{}, error) {
+	return webutil.GetRecord(env, func(db *sqlx.DB, id interface{}) (interface{}, error) {
 		return GetCountry(db, id.(int))
 	})
 }
 
 func CountryCreate(env *config.Env) http.Handler {
-	return webutil.CreateRecord(env, Country{}, func(db *sql.DB, byteData []byte) (interface{}, error) {
+	return webutil.CreateRecord(env, Country{}, func(db *sqlx.DB, byteData []byte) (interface{}, error) {
 		data := Country{}
 		json.Unmarshal(byteData, &data)
 		return CreateCountry(db, data)
@@ -30,7 +30,7 @@ func CountryCreate(env *config.Env) http.Handler {
 }
 
 func CountryUpdate(env *config.Env) http.Handler {
-	return webutil.UpdateRecord(env, Country{}, func(db *sql.DB, id interface{}, byteData []byte) (interface{}, error) {
+	return webutil.UpdateRecord(env, Country{}, func(db *sqlx.DB, id interface{}, byteData []byte) (interface{}, error) {
 		data := Country{}
 		json.Unmarshal(byteData, &data)
 		return UpdateCountry(db, id.(int), data)
@@ -38,7 +38,7 @@ func CountryUpdate(env *config.Env) http.Handler {
 }
 
 func CountryDelete(env *config.Env) http.Handler {
-	return webutil.DeleteRecord(env, func(db *sql.DB, id interface{}) error {
+	return webutil.DeleteRecord(env, func(db *sqlx.DB, id interface{}) error {
 		return DeleteCountry(db, id.(int))
 	})
 }

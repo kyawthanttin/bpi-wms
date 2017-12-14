@@ -1,85 +1,66 @@
 package unitofmeasurement
 
 import (
-	"database/sql"
+	"errors"
+	"strconv"
+
+	"github.com/jmoiron/sqlx"
+	"github.com/kyawthanttin/bpi-wms/dbutil"
 )
 
 type UnitOfMeasurement struct {
 	Id   int    `json:"id"`
-	Name string `json:"name"`
-	Abbr string `json:"abbr"`
+	Abbr string `json:"abbr" dbop:"iu"`
+	Name string `json:"name" dbop:"iu"`
 }
 
-func ListUnitOfMeasurements(db *sql.DB, search string) ([]*UnitOfMeasurement, error) {
-	var rows *sql.Rows
+func ListUnitOfMeasurements(db *sqlx.DB, search string) ([]UnitOfMeasurement, error) {
+	results := []UnitOfMeasurement{}
 	var err error
 
 	if search != "" {
-		rows, err = db.Query("SELECT id, name, abbr FROM Unit_Of_Measurement WHERE UPPER(name) LIKE CONCAT('%', UPPER($1), '%') ORDER BY name", search)
+		s := UnitOfMeasurement{Name: search, Abbr: search}
+		nstmt, _ := db.PrepareNamed("SELECT id, abbr, name FROM UnitOfMeasurement WHERE UPPER(name) LIKE CONCAT('%', UPPER(:name), '%') " +
+			"OR UPPER(abbr) LIKE CONCAT('%', UPPER(:abbr), '%') ORDER BY name LIMIT " + strconv.Itoa(dbutil.MaxResults))
+		err = nstmt.Select(&results, s)
 	} else {
-		rows, err = db.Query("SELECT id, name, abbr FROM Unit_Of_Measurement ORDER BY name")
+		err = db.Select(&results, "SELECT id, abbr, name FROM UnitOfMeasurement ORDER BY name LIMIT "+strconv.Itoa(dbutil.MaxResults))
 	}
-
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	results := make([]*UnitOfMeasurement, 0)
-	for rows.Next() {
-		result := new(UnitOfMeasurement)
-		err := rows.Scan(&result.Id, &result.Name, &result.Abbr)
-		if err != nil {
-			return nil, err
-		}
-		results = append(results, result)
-	}
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-	return results, nil
+	return results, err
 }
 
-func GetUnitOfMeasurement(db *sql.DB, id int) (*UnitOfMeasurement, error) {
-	row := db.QueryRow("SELECT id, name, abbr FROM Unit_Of_Measurement WHERE id = $1", id)
-	result := new(UnitOfMeasurement)
-	err := row.Scan(&result.Id, &result.Name, &result.Abbr)
-	if err != nil {
-		return &UnitOfMeasurement{}, err
-	}
-	return result, nil
+func GetUnitOfMeasurement(db *sqlx.DB, id int) (UnitOfMeasurement, error) {
+	result := UnitOfMeasurement{}
+	err := db.Get(&result, "SELECT id, abbr, name FROM UnitOfMeasurement WHERE id = $1", id)
+	return result, err
 }
 
-func CreateUnitOfMeasurement(db *sql.DB, data UnitOfMeasurement) (*UnitOfMeasurement, error) {
-	sqlStatement := `INSERT INTO Unit_Of_Measurement(name, abbr) VALUES ($1) RETURNING id`
-	var id int
-	err := db.QueryRow(sqlStatement, data.Name, data.Abbr).Scan(&id)
+func CreateUnitOfMeasurement(db *sqlx.DB, data UnitOfMeasurement) (UnitOfMeasurement, error) {
+	if exist, _ := dbutil.IsExist(db, "UnitOfMeasurement", "abbr", data.Abbr); exist {
+		return UnitOfMeasurement{}, errors.New("Same unit-of-measurment already exists")
+	}
+	id, err := dbutil.Insert(db, "UnitOfMeasurement", &data)
 	if err != nil {
-		return &UnitOfMeasurement{}, err
+		return UnitOfMeasurement{}, err
+	}
+	return GetUnitOfMeasurement(db, id.(int))
+}
+
+func UpdateUnitOfMeasurement(db *sqlx.DB, id int, data UnitOfMeasurement) (UnitOfMeasurement, error) {
+	if exist, _ := dbutil.IsExist(db, "UnitOfMeasurement", "id", id); !exist {
+		return UnitOfMeasurement{}, errors.New("No such unit-of-measurement")
+	}
+	err := dbutil.Update(db, "UnitOfMeasurement", &data, &UnitOfMeasurement{Id: id})
+	if err != nil {
+		return UnitOfMeasurement{}, err
 	}
 	return GetUnitOfMeasurement(db, id)
 }
 
-func UpdateUnitOfMeasurement(db *sql.DB, id int, data UnitOfMeasurement) (*UnitOfMeasurement, error) {
-	_, err := db.Exec("UPDATE Unit_Of_Measurement SET name = $1, abbr = $2 WHERE id = $3", data.Name, data.Abbr, id)
-	if err != nil {
-		return &UnitOfMeasurement{}, err
+func DeleteUnitOfMeasurement(db *sqlx.DB, id int) error {
+	if exist, _ := dbutil.IsExist(db, "UnitOfMeasurement", "id", id); !exist {
+		return errors.New("No such unit-of-measurement")
 	}
-	return GetUnitOfMeasurement(db, id)
-}
-
-func DeleteUnitOfMeasurement(db *sql.DB, id int) error {
-	if _, err := GetUnitOfMeasurement(db, id); err != nil {
-		return err
-	}
-
-	result, err := db.Exec("DELETE FROM Unit_Of_Measurement WHERE id = $1", id)
-	if err != nil {
-		return err
-	}
-	_, err = result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err := db.Exec("DELETE FROM UnitOfMeasurement WHERE id = $1", id)
+	return err
 }

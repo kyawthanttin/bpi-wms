@@ -1,84 +1,65 @@
 package customer
 
 import (
-	"database/sql"
+	"errors"
+	"strconv"
+
+	"github.com/jmoiron/sqlx"
+	"github.com/kyawthanttin/bpi-wms/dbutil"
 )
 
 type Customer struct {
-	Id   int    `json:"id"`
-	Name string `json:"name"`
+	Id      int    `json:"id"`
+	Name    string `json:"name" dbop:"iu"`
+	Address string `json:"address" dbop:"iu"`
 }
 
-func ListCustomers(db *sql.DB, search string) ([]*Customer, error) {
-	var rows *sql.Rows
+func ListCustomers(db *sqlx.DB, search string) ([]Customer, error) {
+	results := []Customer{}
 	var err error
 
 	if search != "" {
-		rows, err = db.Query("SELECT id, name FROM Customer WHERE UPPER(name) LIKE CONCAT('%', UPPER($1), '%') ORDER BY name", search)
+		s := Customer{Name: search}
+		nstmt, _ := db.PrepareNamed("SELECT id, name, address FROM Customer WHERE UPPER(name) LIKE CONCAT('%', UPPER(:name), '%') ORDER BY name LIMIT " + strconv.Itoa(dbutil.MaxResults))
+		err = nstmt.Select(&results, s)
 	} else {
-		rows, err = db.Query("SELECT id, name FROM Customer ORDER BY name")
+		err = db.Select(&results, "SELECT id, name, address FROM Customer ORDER BY name LIMIT "+strconv.Itoa(dbutil.MaxResults))
 	}
-
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	results := make([]*Customer, 0)
-	for rows.Next() {
-		result := new(Customer)
-		err := rows.Scan(&result.Id, &result.Name)
-		if err != nil {
-			return nil, err
-		}
-		results = append(results, result)
-	}
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-	return results, nil
+	return results, err
 }
 
-func GetCustomer(db *sql.DB, id int) (*Customer, error) {
-	row := db.QueryRow("SELECT id, name FROM Customer WHERE id = $1", id)
-	result := new(Customer)
-	err := row.Scan(&result.Id, &result.Name)
-	if err != nil {
-		return &Customer{}, err
-	}
-	return result, nil
+func GetCustomer(db *sqlx.DB, id int) (Customer, error) {
+	result := Customer{}
+	err := db.Get(&result, "SELECT id, name, address FROM Customer WHERE id = $1", id)
+	return result, err
 }
 
-func CreateCustomer(db *sql.DB, data Customer) (*Customer, error) {
-	sqlStatement := `INSERT INTO Customer(name) VALUES ($1) RETURNING id`
-	var id int
-	err := db.QueryRow(sqlStatement, data.Name).Scan(&id)
+func CreateCustomer(db *sqlx.DB, data Customer) (Customer, error) {
+	if exist, _ := dbutil.IsExist(db, "Customer", "name", data.Name); exist {
+		return Customer{}, errors.New("Same customer already exists")
+	}
+	id, err := dbutil.Insert(db, "Customer", &data)
 	if err != nil {
-		return &Customer{}, err
+		return Customer{}, err
+	}
+	return GetCustomer(db, id.(int))
+}
+
+func UpdateCustomer(db *sqlx.DB, id int, data Customer) (Customer, error) {
+	if exist, _ := dbutil.IsExist(db, "Customer", "id", id); !exist {
+		return Customer{}, errors.New("No such customer")
+	}
+	err := dbutil.Update(db, "Customer", &data, &Customer{Id: id})
+	if err != nil {
+		return Customer{}, err
 	}
 	return GetCustomer(db, id)
 }
 
-func UpdateCustomer(db *sql.DB, id int, data Customer) (*Customer, error) {
-	_, err := db.Exec("UPDATE Customer SET name = $1 WHERE id = $2", data.Name, id)
-	if err != nil {
-		return &Customer{}, err
+func DeleteCustomer(db *sqlx.DB, id int) error {
+	if exist, _ := dbutil.IsExist(db, "Customer", "id", id); !exist {
+		return errors.New("No such customer")
 	}
-	return GetCustomer(db, id)
-}
-
-func DeleteCustomer(db *sql.DB, id int) error {
-	if _, err := GetCustomer(db, id); err != nil {
-		return err
-	}
-
-	result, err := db.Exec("DELETE FROM Customer WHERE id = $1", id)
-	if err != nil {
-		return err
-	}
-	_, err = result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err := db.Exec("DELETE FROM Customer WHERE id = $1", id)
+	return err
 }
