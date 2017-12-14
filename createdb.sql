@@ -48,3 +48,19 @@ create table unitofmeasurement (
   name varchar(255) NOT NULL,
   is_sync boolean NOT NULL DEFAULT FALSE
  );
+
+ create sequence item_id_seq;
+ create table item (
+   id int primary key default nextval('item_id_seq'::regclass),
+   code varchar(255) NOT NULL UNIQUE,
+   name varchar(255) NOT NULL,
+   type varchar(255) NOT NULL,
+   brand_name varchar(255),
+   packing_size varchar(255),
+   case_pack float NOT NULL CHECK (case_pack > 0),
+   caseuom int NOT NULL REFERENCES unitofmeasurement ON DELETE RESTRICT,
+   pieceuom int NOT NULL REFERENCES unitofmeasurement ON DELETE RESTRICT,
+   category int NOT NULL REFERENCES category ON DELETE RESTRICT,
+   created timestamp with time zone NOT NULL,
+   last_modified timestamp with time zone NOT NULL
+ );

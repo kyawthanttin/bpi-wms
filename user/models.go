@@ -5,8 +5,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/leebenson/conform"
-
 	"github.com/jmoiron/sqlx"
 	"github.com/kyawthanttin/bpi-wms/dbutil"
 
@@ -15,9 +13,9 @@ import (
 
 type User struct {
 	Id        int       `json:"id"`
-	Username  string    `json:"username" conform:"snake" dbop:"iu"`
+	Username  string    `json:"username" dbop:"iu"`
 	Password  string    `json:"password" dbop:"i"`
-	Name      string    `json:"name" conform:"name" dbop:"iu"`
+	Name      string    `json:"name" dbop:"iu"`
 	Roles     string    `json:"roles" dbop:"iu"`
 	IsEnabled bool      `json:"isEnabled" db:"is_enabled" dbop:"iu"`
 	Created   time.Time `json:"created" dbop:"i"`
@@ -52,7 +50,6 @@ func GetUserByUsername(db *sqlx.DB, username string) (User, error) {
 }
 
 func CreateUser(db *sqlx.DB, data User) (User, error) {
-	conform.Strings(&data)
 	if exist, _ := dbutil.IsExist(db, "Login_User", "username", data.Username); exist {
 		return User{}, errors.New("Same username already exists")
 	}
@@ -74,7 +71,6 @@ func UpdateUser(db *sqlx.DB, id int, data User) (User, error) {
 	if exist, _ := dbutil.IsExist(db, "Login_User", "id", id); !exist {
 		return User{}, errors.New("No such user")
 	}
-	conform.Strings(&data)
 	err := dbutil.Update(db, "Login_User", &data, &User{Id: id})
 	if err != nil {
 		return User{}, err

@@ -1,99 +1,86 @@
 package item
 
 import (
-	"database/sql"
+	"errors"
+	"strconv"
 	"time"
+
+	"github.com/jmoiron/sqlx"
+	"github.com/kyawthanttin/bpi-wms/dbutil"
 )
 
 type Item struct {
 	Id           int       `json:"id"`
-	Code         string    `json:"code"`
-	Name         string    `json:"name"`
-	Type         string    `json:"type"`
-	PackingSize  string    `json:"packingSize"`
-	CasePack     float32   `json:"casePack"`
-	CaseUomId    int       `json:"caseUomId"`
-	CaseUom      string    `json:"caseUom"`
-	PieceUomId   int       `json:"pieceUomId"`
-	PieceUom     string    `json:"pieceUom"`
-	CategoryId   int       `json:"categoryId"`
-	Category     string    `json:"category"`
-	Created      time.Time `json:"created"`
-	LastModified time.Time `json:"lastModified"`
+	Code         string    `json:"code" dbop:"i"`
+	Name         string    `json:"name" dbop:"iu"`
+	Type         string    `json:"type" dbop:"iu"`
+	BrandName    string    `json:"brandName" db:"brand_name" dbop:"iu"`
+	PackingSize  string    `json:"packingSize" db:"packing_size" dbop:"iu"`
+	CasePack     float32   `json:"casePack" db:"case_pack" dbop:"iu"`
+	CaseUom      int       `json:"caseUom" db:"caseuom" dbop:"iu"`
+	CaseUomName  string    `json:"caseUomName" db:"caseuomname"`
+	PieceUom     int       `json:"pieceUom" db:"pieceuom" dbop:"iu"`
+	PieceUomName string    `json:"pieceUomName" db:"pieceuomname"`
+	Category     int       `json:"category" dbop:"iu"`
+	CategoryName string    `json:"categoryName" db:"categoryname"`
+	Created      time.Time `json:"created" dbop:"i"`
+	LastModified time.Time `json:"lastModified" db:"last_modified" dbop:"iu"`
 }
 
-func ListItems(db *sql.DB, search string) ([]*Item, error) {
-	var rows *sql.Rows
+func ListItems(db *sqlx.DB, search string) ([]Item, error) {
+	results := []Item{}
 	var err error
 
 	if search != "" {
-		rows, err = db.Query("SELECT id, code, name, type, packing_size, case_pack, case_uom, piece_uom, category FROM Item "+
-			"WHERE UPPER(code) LIKE CONCAT('%', UPPER($1), '%') OR UPPER(name) LIKE CONCAT('%', UPPER($1), '%') ORDER BY code", search)
+		s := Item{Code: search, Name: search}
+		nstmt, _ := db.PrepareNamed("SELECT id, code, name, type, brand_name, packing_size, case_pack, caseuom, pieceuom, category FROM Item " +
+			"WHERE UPPER(code) LIKE CONCAT('%', UPPER(:code), '%') OR UPPER(name) LIKE CONCAT('%', UPPER(:name), '%') ORDER BY name LIMIT " + strconv.Itoa(dbutil.MaxResults))
+		err = nstmt.Select(&results, s)
 	} else {
-		rows, err = db.Query("SELECT id, code, name, type, packing_size, case_pack, case_uom, piece_uom, category FROM Item ORDER BY code")
+		err = db.Select(&results, "SELECT id, code, name, type, brand_name, packing_size, case_pack, caseuom, pieceuom, category FROM Item ORDER BY name LIMIT "+
+			strconv.Itoa(dbutil.MaxResults))
 	}
-
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	results := make([]*Item, 0)
-	for rows.Next() {
-		result := new(Item)
-		err := rows.Scan(&result.Id, &result.Code, &result.Name, &result.Type, &result.PackingSize, &result.CasePack, &result.CaseUomId, &result.PieceUomId, &result.CategoryId)
-		if err != nil {
-			return nil, err
-		}
-		results = append(results, result)
-	}
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-	return results, nil
+	return results, err
 }
 
-func GetItem(db *sql.DB, id int) (*Item, error) {
-	row := db.QueryRow("SELECT id, code, name, type, packing_size, case_pack, case_uom, piece_uom, category, created, last_modified FROM Item WHERE id = $1", id)
-	result := new(Item)
-	err := row.Scan(&result.Id, &result.Code, &result.Name, &result.Type, &result.PackingSize, &result.CasePack, &result.CaseUomId, &result.PieceUomId, &result.CategoryId, &result.Created, &result.LastModified)
-	if err != nil {
-		return &Item{}, err
-	}
-	return result, nil
+func GetItem(db *sqlx.DB, id int) (Item, error) {
+	result := Item{}
+	err := db.Get(&result, "SELECT i.id, i.code, i.name, i.type, i.brand_name, i.packing_size, i.case_pack, i.caseuom, i.pieceuom, i.category, i.created, i.last_modified, "+
+		"c.name AS categoryname, u1.name || ' (' || u1.abbr || ')' AS caseuomname, u2.name || ' (' || u2.abbr || ')' AS pieceuomname "+
+		"FROM Item i, Category c, UnitOfMeasurement u1, UnitOfMeasurement u2 "+
+		"WHERE i.category = c.id AND i.caseuom = u1.id AND i.pieceuom = u2.id AND i.id = $1", id)
+	return result, err
 }
 
-func CreateItem(db *sql.DB, data Item) (*Item, error) {
-	sqlStatement := `INSERT INTO Item(code, name, type, packing_size, case_pack, case_uom, piece_uom, category, created, last_modified) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`
-	var id int
-	err := db.QueryRow(sqlStatement, data.Code, data.Name, data.Type, data.PackingSize, data.CasePack, data.CaseUomId, data.PieceUomId, data.CategoryId, time.Now(), time.Now()).Scan(&id)
+func CreateItem(db *sqlx.DB, data Item) (Item, error) {
+	if exist, _ := dbutil.IsExist(db, "Item", "code", data.Code); exist {
+		return Item{}, errors.New("Same item code already exists")
+	}
+	data.Created = time.Now()
+	data.LastModified = time.Now()
+	id, err := dbutil.Insert(db, "Item", &data)
 	if err != nil {
-		return &Item{}, err
+		return Item{}, err
+	}
+	return GetItem(db, id.(int))
+}
+
+func UpdateItem(db *sqlx.DB, id int, data Item) (Item, error) {
+	if exist, _ := dbutil.IsExist(db, "Item", "id", id); !exist {
+		return Item{}, errors.New("No such item")
+	}
+	data.LastModified = time.Now()
+	err := dbutil.Update(db, "Item", &data, &Item{Id: id})
+	if err != nil {
+		return Item{}, err
 	}
 	return GetItem(db, id)
 }
 
-func UpdateItem(db *sql.DB, id int, data Item) (*Item, error) {
-	_, err := db.Exec("UPDATE Item SET code = $1, name = $2, type = $3, packing_size = $4, case_pack = $5, case_uom = $6, piece_uom = $7, category = $8, last_modified = $9 WHERE id = $10",
-		data.Code, data.Name, data.Type, data.PackingSize, data.CasePack, data.CaseUomId, data.PieceUomId, data.CategoryId, time.Now(), id)
-	if err != nil {
-		return &Item{}, err
+func DeleteItem(db *sqlx.DB, id int) error {
+	if exist, _ := dbutil.IsExist(db, "Item", "id", id); !exist {
+		return errors.New("No such item")
 	}
-	return GetItem(db, id)
-}
-
-func DeleteItem(db *sql.DB, id int) error {
-	if _, err := GetItem(db, id); err != nil {
-		return err
-	}
-
-	result, err := db.Exec("DELETE FROM Item WHERE id = $1", id)
-	if err != nil {
-		return err
-	}
-	_, err = result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err := db.Exec("DELETE FROM Item WHERE id = $1", id)
+	return err
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/kyawthanttin/bpi-wms/country"
 	"github.com/kyawthanttin/bpi-wms/customer"
 	"github.com/kyawthanttin/bpi-wms/dbutil"
+	"github.com/kyawthanttin/bpi-wms/item"
 	"github.com/kyawthanttin/bpi-wms/supplier"
 	"github.com/kyawthanttin/bpi-wms/unitofmeasurement"
 	"github.com/kyawthanttin/bpi-wms/user"
@@ -56,11 +57,11 @@ func NewRouter() *mux.Router {
 	r.Handle("/customers/{id:[0-9]+}", authentication.AuthenticateWithRoles(env, customer.CustomerUpdate(env), []string{adminRoleName})).Methods("PUT")
 	r.Handle("/customers/{id:[0-9]+}", authentication.AuthenticateWithRoles(env, customer.CustomerDelete(env), []string{adminRoleName})).Methods("DELETE")
 
-	// r.Handle("/items", authentication.AuthenticateWithRoles(env, item.ItemList(env), []string{adminRoleName})).Methods("GET")
-	// r.Handle("/items/create", authentication.AuthenticateWithRoles(env, item.ItemCreate(env), []string{adminRoleName})).Methods("POST")
-	// r.Handle("/items/{id:[0-9]+}", authentication.AuthenticateWithRoles(env, item.ItemShow(env), nil)).Methods("GET")
-	// r.Handle("/items/{id:[0-9]+}", authentication.AuthenticateWithRoles(env, item.ItemUpdate(env), []string{adminRoleName})).Methods("PUT")
-	// r.Handle("/items/{id:[0-9]+}", authentication.AuthenticateWithRoles(env, item.ItemDelete(env), []string{adminRoleName})).Methods("DELETE")
+	r.Handle("/items", authentication.AuthenticateWithRoles(env, item.ItemList(env), []string{adminRoleName})).Methods("GET")
+	r.Handle("/items/create", authentication.AuthenticateWithRoles(env, item.ItemCreate(env), []string{adminRoleName})).Methods("POST")
+	r.Handle("/items/{id:[0-9]+}", authentication.AuthenticateWithRoles(env, item.ItemShow(env), nil)).Methods("GET")
+	r.Handle("/items/{id:[0-9]+}", authentication.AuthenticateWithRoles(env, item.ItemUpdate(env), []string{adminRoleName})).Methods("PUT")
+	r.Handle("/items/{id:[0-9]+}", authentication.AuthenticateWithRoles(env, item.ItemDelete(env), []string{adminRoleName})).Methods("DELETE")
 
 	r.Handle("/suppliers", authentication.AuthenticateWithRoles(env, supplier.SupplierList(env), []string{adminRoleName})).Methods("GET")
 	r.Handle("/suppliers/create", authentication.AuthenticateWithRoles(env, supplier.SupplierCreate(env), []string{adminRoleName})).Methods("POST")
