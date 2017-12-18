@@ -25,16 +25,24 @@ func DescribeErrors(errs validator.ValidationErrors) error {
 	for _, err := range errs {
 		msg.WriteString("Validation failed for '" + err.Namespace() + "': ")
 		switch err.Tag() {
+		case "alphanum":
+			msg.WriteString(` Must contains only uppercase/lowercase letters and/or digits.`)
+		case "alphanumspecial":
+			msg.WriteString(` Must contains only uppercase/lowercase letters, digits, underscore, hyphen, space and/or special symbol("@#$%-").`)
+		case "gt":
+			msg.WriteString(" Value must be greater than '" + err.Param() + "'.")
+		case "lt":
+			msg.WriteString(" Value must be less than '" + err.Param() + "'.")
+		case "password":
+			msg.WriteString(` Must be 6 to 30 characters containing at least one digit, one uppercase letter, one lowercase letter and one special symbol (“@#$%”).`)
+		case "required":
+			msg.WriteString(" Must not be empty.")
 		case "strmin":
 			msg.WriteString(" Length must be at least '" + err.Param() + "' characters.")
 		case "strmax":
 			msg.WriteString(" Must be maxium length of '" + err.Param() + "'.")
 		case "username":
 			msg.WriteString(" Must be 3 to 20 characters containing any lowercase letter, digit, underscore or hyphen.")
-		case "password":
-			msg.WriteString(` Must be 6 to 30 characters containing at least one digit, one uppercase letter, one lowercase letter and one special symbol (“@#$%”).`)
-		case "alphanumspecial":
-			msg.WriteString(` Zero or more characters containing any uppercase/lowercase letter, digit, underscore, hyphen, space or special symbol("@#$%-") only.`)
 		}
 		msg.WriteString("\n")
 	}

@@ -7,24 +7,26 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/kyawthanttin/bpi-wms/dbutil"
+	"github.com/kyawthanttin/bpi-wms/validation"
+	validator "gopkg.in/go-playground/validator.v9"
 )
 
 type Item struct {
-	Id           int       `json:"id"`
-	Code         string    `json:"code" dbop:"i"`
-	Name         string    `json:"name" dbop:"iu"`
-	Type         string    `json:"type" dbop:"iu"`
-	BrandName    string    `json:"brandName" db:"brand_name" dbop:"iu"`
-	PackingSize  string    `json:"packingSize" db:"packing_size" dbop:"iu"`
-	CasePack     float32   `json:"casePack" db:"case_pack" dbop:"iu"`
-	CaseUom      int       `json:"caseUom" db:"caseuom" dbop:"iu"`
-	CaseUomName  string    `json:"caseUomName" db:"caseuomname"`
-	PieceUom     int       `json:"pieceUom" db:"pieceuom" dbop:"iu"`
-	PieceUomName string    `json:"pieceUomName" db:"pieceuomname"`
-	Category     int       `json:"category" dbop:"iu"`
-	CategoryName string    `json:"categoryName" db:"categoryname"`
-	Created      time.Time `json:"created" dbop:"i"`
-	LastModified time.Time `json:"lastModified" db:"last_modified" dbop:"iu"`
+	Id           int       `json:"id" validate:"-"`
+	Code         string    `json:"code" dbop:"i" validate:"strmin=1,strmax=12,alphanum"`
+	Name         string    `json:"name" dbop:"iu" validate:"strmin=1,strmax=100,alphanumspecial"`
+	Type         string    `json:"type" dbop:"iu" validate:"strmin=1,strmax=100,alphanumspecial"`
+	BrandName    string    `json:"brandName" db:"brand_name" dbop:"iu" validate:"strmax=100,alphanumspecial"`
+	PackingSize  string    `json:"packingSize" db:"packing_size" dbop:"iu" validate:"strmax=100,alphanumspecial"`
+	CasePack     float32   `json:"casePack" db:"case_pack" dbop:"iu" validate:"required,gt=0"`
+	CaseUom      int       `json:"caseUom" db:"caseuom" dbop:"iu" validate:"required,gt=0"`
+	CaseUomName  string    `json:"caseUomName" db:"caseuomname" validate:"-"`
+	PieceUom     int       `json:"pieceUom" db:"pieceuom" dbop:"iu" validate:"required,gt=0"`
+	PieceUomName string    `json:"pieceUomName" db:"pieceuomname" validate:"-"`
+	Category     int       `json:"category" dbop:"iu" validate:"required,gt=0"`
+	CategoryName string    `json:"categoryName" db:"categoryname" validate:"-"`
+	Created      time.Time `json:"created" dbop:"i" validate:"-"`
+	LastModified time.Time `json:"lastModified" db:"last_modified" dbop:"iu" validate:"-"`
 }
 
 func ListItems(db *sqlx.DB, search string) ([]Item, error) {
@@ -52,7 +54,10 @@ func GetItem(db *sqlx.DB, id int) (Item, error) {
 	return result, err
 }
 
-func CreateItem(db *sqlx.DB, data Item) (Item, error) {
+func CreateItem(db *sqlx.DB, validate *validator.Validate, data Item) (Item, error) {
+	if err := validate.Struct(data); err != nil {
+		return Item{}, validation.DescribeErrors(err.(validator.ValidationErrors))
+	}
 	if exist, _ := dbutil.IsExist(db, "Item", "code", data.Code); exist {
 		return Item{}, errors.New("Same item code already exists")
 	}
@@ -65,9 +70,12 @@ func CreateItem(db *sqlx.DB, data Item) (Item, error) {
 	return GetItem(db, id.(int))
 }
 
-func UpdateItem(db *sqlx.DB, id int, data Item) (Item, error) {
+func UpdateItem(db *sqlx.DB, validate *validator.Validate, id int, data Item) (Item, error) {
 	if exist, _ := dbutil.IsExist(db, "Item", "id", id); !exist {
 		return Item{}, errors.New("No such item")
+	}
+	if err := validate.Struct(data); err != nil {
+		return Item{}, validation.DescribeErrors(err.(validator.ValidationErrors))
 	}
 	data.LastModified = time.Now()
 	err := dbutil.Update(db, "Item", &data, &Item{Id: id})

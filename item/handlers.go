@@ -7,6 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/kyawthanttin/bpi-wms/config"
 	"github.com/kyawthanttin/bpi-wms/webutil"
+	validator "gopkg.in/go-playground/validator.v9"
 )
 
 func ItemList(env *config.Env) http.Handler {
@@ -22,18 +23,18 @@ func ItemShow(env *config.Env) http.Handler {
 }
 
 func ItemCreate(env *config.Env) http.Handler {
-	return webutil.CreateRecord(env, Item{}, func(db *sqlx.DB, byteData []byte) (interface{}, error) {
+	return webutil.CreateRecord(env, Item{}, func(db *sqlx.DB, validate *validator.Validate, byteData []byte) (interface{}, error) {
 		data := Item{}
 		json.Unmarshal(byteData, &data)
-		return CreateItem(db, data)
+		return CreateItem(db, validate, data)
 	})
 }
 
 func ItemUpdate(env *config.Env) http.Handler {
-	return webutil.UpdateRecord(env, Item{}, func(db *sqlx.DB, id interface{}, byteData []byte) (interface{}, error) {
+	return webutil.UpdateRecord(env, Item{}, func(db *sqlx.DB, validate *validator.Validate, id interface{}, byteData []byte) (interface{}, error) {
 		data := Item{}
 		json.Unmarshal(byteData, &data)
-		return UpdateItem(db, id.(int), data)
+		return UpdateItem(db, validate, id.(int), data)
 	})
 }
 
