@@ -4,14 +4,17 @@ import (
 	"errors"
 	"strconv"
 
+	"gopkg.in/go-playground/validator.v9"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/kyawthanttin/bpi-wms/dbutil"
+	"github.com/kyawthanttin/bpi-wms/validation"
 )
 
 type Supplier struct {
-	Id      int    `json:"id"`
-	Name    string `json:"name" dbop:"iu"`
-	Address string `json:"address" dbop:"iu"`
+	Id      int    `json:"id" validate:"-"`
+	Name    string `json:"name" dbop:"iu" validate:"strmin=1,strmax=50,alphanumspecial"`
+	Address string `json:"address" dbop:"iu" validate:"strmax=250"`
 }
 
 func ListSuppliers(db *sqlx.DB, search string) ([]Supplier, error) {
@@ -34,7 +37,10 @@ func GetSupplier(db *sqlx.DB, id int) (Supplier, error) {
 	return result, err
 }
 
-func CreateSupplier(db *sqlx.DB, data Supplier) (Supplier, error) {
+func CreateSupplier(db *sqlx.DB, validate *validator.Validate, data Supplier) (Supplier, error) {
+	if err := validate.Struct(data); err != nil {
+		return Supplier{}, validation.DescribeErrors(err.(validator.ValidationErrors))
+	}
 	if exist, _ := dbutil.IsExist(db, "Supplier", "name", data.Name); exist {
 		return Supplier{}, errors.New("Same supplier already exists")
 	}
@@ -45,9 +51,15 @@ func CreateSupplier(db *sqlx.DB, data Supplier) (Supplier, error) {
 	return GetSupplier(db, id.(int))
 }
 
-func UpdateSupplier(db *sqlx.DB, id int, data Supplier) (Supplier, error) {
+func UpdateSupplier(db *sqlx.DB, validate *validator.Validate, id int, data Supplier) (Supplier, error) {
 	if exist, _ := dbutil.IsExist(db, "Supplier", "id", id); !exist {
 		return Supplier{}, errors.New("No such supplier")
+	}
+	if err := validate.Struct(data); err != nil {
+		return Supplier{}, validation.DescribeErrors(err.(validator.ValidationErrors))
+	}
+	if exist, _ := dbutil.IsExistExcept(db, "Supplier", id, "name", data.Name); exist {
+		return Supplier{}, errors.New("Same supplier already exists")
 	}
 	err := dbutil.Update(db, "Supplier", &data, &Supplier{Id: id})
 	if err != nil {

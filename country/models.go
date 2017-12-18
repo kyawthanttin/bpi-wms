@@ -6,11 +6,13 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/kyawthanttin/bpi-wms/dbutil"
+	"github.com/kyawthanttin/bpi-wms/validation"
+	validator "gopkg.in/go-playground/validator.v9"
 )
 
 type Country struct {
-	Id   int    `json:"id"`
-	Name string `json:"name" dbop:"iu"`
+	Id   int    `json:"id" validate:"-"`
+	Name string `json:"name" dbop:"iu" validate:"strmin=1,strmax=50,alphanumspecial"`
 }
 
 func ListCountries(db *sqlx.DB, search string) ([]Country, error) {
@@ -33,7 +35,10 @@ func GetCountry(db *sqlx.DB, id int) (Country, error) {
 	return result, err
 }
 
-func CreateCountry(db *sqlx.DB, data Country) (Country, error) {
+func CreateCountry(db *sqlx.DB, validate *validator.Validate, data Country) (Country, error) {
+	if err := validate.Struct(data); err != nil {
+		return Country{}, validation.DescribeErrors(err.(validator.ValidationErrors))
+	}
 	if exist, _ := dbutil.IsExist(db, "Country", "name", data.Name); exist {
 		return Country{}, errors.New("Same country already exists")
 	}
@@ -44,9 +49,15 @@ func CreateCountry(db *sqlx.DB, data Country) (Country, error) {
 	return GetCountry(db, id.(int))
 }
 
-func UpdateCountry(db *sqlx.DB, id int, data Country) (Country, error) {
+func UpdateCountry(db *sqlx.DB, validate *validator.Validate, id int, data Country) (Country, error) {
 	if exist, _ := dbutil.IsExist(db, "Country", "id", id); !exist {
 		return Country{}, errors.New("No such country")
+	}
+	if err := validate.Struct(data); err != nil {
+		return Country{}, validation.DescribeErrors(err.(validator.ValidationErrors))
+	}
+	if exist, _ := dbutil.IsExistExcept(db, "Country", id, "name", data.Name); exist {
+		return Country{}, errors.New("Same country already exists")
 	}
 	err := dbutil.Update(db, "Country", &data, &Country{Id: id})
 	if err != nil {

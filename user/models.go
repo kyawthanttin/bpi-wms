@@ -7,19 +7,21 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/kyawthanttin/bpi-wms/dbutil"
+	"github.com/kyawthanttin/bpi-wms/validation"
+	validator "gopkg.in/go-playground/validator.v9"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
 type User struct {
-	Id        int       `json:"id"`
-	Username  string    `json:"username" dbop:"iu"`
-	Password  string    `json:"password" dbop:"i"`
-	Name      string    `json:"name" dbop:"iu"`
-	Roles     string    `json:"roles" dbop:"iu"`
-	IsEnabled bool      `json:"isEnabled" db:"is_enabled" dbop:"iu"`
-	Created   time.Time `json:"created" dbop:"i"`
-	LastLogin time.Time `json:"lastLogin" db:"last_login" dbop:"i"`
+	Id        int       `json:"id" validate:"-"`
+	Username  string    `json:"username" dbop:"iu" validate:"username"`
+	Password  string    `json:"password" dbop:"i" validate:"omitempty,password"`
+	Name      string    `json:"name" dbop:"iu" validate:"strmin=1,strmax=50,alphanumspecial"`
+	Roles     string    `json:"roles" dbop:"iu" validate:"strmin=1"`
+	IsEnabled bool      `json:"isEnabled" db:"is_enabled" dbop:"iu" validate:"-"`
+	Created   time.Time `json:"created" dbop:"i" validate:"-"`
+	LastLogin time.Time `json:"lastLogin" db:"last_login" dbop:"i" validate:"-"`
 }
 
 func ListUsers(db *sqlx.DB, search string) ([]User, error) {
@@ -49,7 +51,10 @@ func GetUserByUsername(db *sqlx.DB, username string) (User, error) {
 	return result, err
 }
 
-func CreateUser(db *sqlx.DB, data User) (User, error) {
+func CreateUser(db *sqlx.DB, validate *validator.Validate, data User) (User, error) {
+	if err := validate.Struct(data); err != nil {
+		return User{}, validation.DescribeErrors(err.(validator.ValidationErrors))
+	}
 	if exist, _ := dbutil.IsExist(db, "Login_User", "username", data.Username); exist {
 		return User{}, errors.New("Same username already exists")
 	}
@@ -67,9 +72,12 @@ func CreateUser(db *sqlx.DB, data User) (User, error) {
 	return GetUser(db, id.(int))
 }
 
-func UpdateUser(db *sqlx.DB, id int, data User) (User, error) {
+func UpdateUser(db *sqlx.DB, validate *validator.Validate, id int, data User) (User, error) {
 	if exist, _ := dbutil.IsExist(db, "Login_User", "id", id); !exist {
 		return User{}, errors.New("No such user")
+	}
+	if err := validate.Struct(data); err != nil {
+		return User{}, validation.DescribeErrors(err.(validator.ValidationErrors))
 	}
 	err := dbutil.Update(db, "Login_User", &data, &User{Id: id})
 	if err != nil {
@@ -86,9 +94,12 @@ func DeleteUser(db *sqlx.DB, id int) error {
 	return err
 }
 
-func ChangePassword(db *sqlx.DB, id int, password string) (User, error) {
+func ChangePassword(db *sqlx.DB, validate *validator.Validate, id int, password string) (User, error) {
 	if exist, _ := dbutil.IsExist(db, "Login_User", "id", id); !exist {
 		return User{}, errors.New("No such user")
+	}
+	if err := validate.Var(password, "password"); err != nil {
+		return User{}, validation.DescribeErrors(err.(validator.ValidationErrors))
 	}
 	hashPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
 	if err != nil {

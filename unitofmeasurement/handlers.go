@@ -7,6 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/kyawthanttin/bpi-wms/config"
 	"github.com/kyawthanttin/bpi-wms/webutil"
+	validator "gopkg.in/go-playground/validator.v9"
 )
 
 func UnitOfMeasurementList(env *config.Env) http.Handler {
@@ -22,18 +23,18 @@ func UnitOfMeasurementShow(env *config.Env) http.Handler {
 }
 
 func UnitOfMeasurementCreate(env *config.Env) http.Handler {
-	return webutil.CreateRecord(env, UnitOfMeasurement{}, func(db *sqlx.DB, byteData []byte) (interface{}, error) {
+	return webutil.CreateRecord(env, UnitOfMeasurement{}, func(db *sqlx.DB, validate *validator.Validate, byteData []byte) (interface{}, error) {
 		data := UnitOfMeasurement{}
 		json.Unmarshal(byteData, &data)
-		return CreateUnitOfMeasurement(db, data)
+		return CreateUnitOfMeasurement(db, validate, data)
 	})
 }
 
 func UnitOfMeasurementUpdate(env *config.Env) http.Handler {
-	return webutil.UpdateRecord(env, UnitOfMeasurement{}, func(db *sqlx.DB, id interface{}, byteData []byte) (interface{}, error) {
+	return webutil.UpdateRecord(env, UnitOfMeasurement{}, func(db *sqlx.DB, validate *validator.Validate, id interface{}, byteData []byte) (interface{}, error) {
 		data := UnitOfMeasurement{}
 		json.Unmarshal(byteData, &data)
-		return UpdateUnitOfMeasurement(db, id.(int), data)
+		return UpdateUnitOfMeasurement(db, validate, id.(int), data)
 	})
 }
 

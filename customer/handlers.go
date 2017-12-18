@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"gopkg.in/go-playground/validator.v9"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/kyawthanttin/bpi-wms/config"
 	"github.com/kyawthanttin/bpi-wms/webutil"
@@ -22,18 +24,18 @@ func CustomerShow(env *config.Env) http.Handler {
 }
 
 func CustomerCreate(env *config.Env) http.Handler {
-	return webutil.CreateRecord(env, Customer{}, func(db *sqlx.DB, byteData []byte) (interface{}, error) {
+	return webutil.CreateRecord(env, Customer{}, func(db *sqlx.DB, validate *validator.Validate, byteData []byte) (interface{}, error) {
 		data := Customer{}
 		json.Unmarshal(byteData, &data)
-		return CreateCustomer(db, data)
+		return CreateCustomer(db, validate, data)
 	})
 }
 
 func CustomerUpdate(env *config.Env) http.Handler {
-	return webutil.UpdateRecord(env, Customer{}, func(db *sqlx.DB, id interface{}, byteData []byte) (interface{}, error) {
+	return webutil.UpdateRecord(env, Customer{}, func(db *sqlx.DB, validate *validator.Validate, id interface{}, byteData []byte) (interface{}, error) {
 		data := Customer{}
 		json.Unmarshal(byteData, &data)
-		return UpdateCustomer(db, id.(int), data)
+		return UpdateCustomer(db, validate, id.(int), data)
 	})
 }
 

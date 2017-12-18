@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"gopkg.in/go-playground/validator.v9"
+
 	"github.com/gorilla/mux"
 	"github.com/jmoiron/sqlx"
 	"github.com/kyawthanttin/bpi-wms/config"
@@ -70,7 +72,7 @@ func GetRecord(env *config.Env, getFunc func(*sqlx.DB, interface{}) (interface{}
 	})
 }
 
-func CreateRecord(env *config.Env, data interface{}, createFunc func(*sqlx.DB, []byte) (interface{}, error)) http.Handler {
+func CreateRecord(env *config.Env, data interface{}, createFunc func(*sqlx.DB, *validator.Validate, []byte) (interface{}, error)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			RespondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
@@ -83,7 +85,7 @@ func CreateRecord(env *config.Env, data interface{}, createFunc func(*sqlx.DB, [
 		}
 		defer r.Body.Close()
 		byteData, _ := json.Marshal(data)
-		created, err := createFunc(env.DB, byteData)
+		created, err := createFunc(env.DB, env.Validate, byteData)
 		if err != nil {
 			RespondWithErrorType(w, err)
 			return
@@ -92,7 +94,7 @@ func CreateRecord(env *config.Env, data interface{}, createFunc func(*sqlx.DB, [
 	})
 }
 
-func UpdateRecord(env *config.Env, data interface{}, updateFunc func(*sqlx.DB, interface{}, []byte) (interface{}, error)) http.Handler {
+func UpdateRecord(env *config.Env, data interface{}, updateFunc func(*sqlx.DB, *validator.Validate, interface{}, []byte) (interface{}, error)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "PUT" {
 			RespondWithError(w, http.StatusBadRequest, "Method Not Allowed")
@@ -111,7 +113,7 @@ func UpdateRecord(env *config.Env, data interface{}, updateFunc func(*sqlx.DB, i
 		}
 		defer r.Body.Close()
 		byteData, _ := json.Marshal(data)
-		updated, err := updateFunc(env.DB, id, byteData)
+		updated, err := updateFunc(env.DB, env.Validate, id, byteData)
 		if err != nil {
 			RespondWithErrorType(w, err)
 			return

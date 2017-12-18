@@ -13,6 +13,7 @@ import (
 	"github.com/kyawthanttin/bpi-wms/supplier"
 	"github.com/kyawthanttin/bpi-wms/unitofmeasurement"
 	"github.com/kyawthanttin/bpi-wms/user"
+	"github.com/kyawthanttin/bpi-wms/validation"
 
 	"github.com/gorilla/mux"
 )
@@ -24,7 +25,9 @@ func NewRouter() *mux.Router {
 		log.Panic(err)
 	}
 
-	env := &config.Env{DB: db}
+	validate := validation.NewValidator()
+
+	env := &config.Env{DB: db, Validate: validate}
 
 	r := mux.NewRouter().StrictSlash(true)
 

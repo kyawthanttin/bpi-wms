@@ -7,6 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/kyawthanttin/bpi-wms/config"
 	"github.com/kyawthanttin/bpi-wms/webutil"
+	validator "gopkg.in/go-playground/validator.v9"
 )
 
 func CountryList(env *config.Env) http.Handler {
@@ -22,18 +23,18 @@ func CountryShow(env *config.Env) http.Handler {
 }
 
 func CountryCreate(env *config.Env) http.Handler {
-	return webutil.CreateRecord(env, Country{}, func(db *sqlx.DB, byteData []byte) (interface{}, error) {
+	return webutil.CreateRecord(env, Country{}, func(db *sqlx.DB, validate *validator.Validate, byteData []byte) (interface{}, error) {
 		data := Country{}
 		json.Unmarshal(byteData, &data)
-		return CreateCountry(db, data)
+		return CreateCountry(db, validate, data)
 	})
 }
 
 func CountryUpdate(env *config.Env) http.Handler {
-	return webutil.UpdateRecord(env, Country{}, func(db *sqlx.DB, id interface{}, byteData []byte) (interface{}, error) {
+	return webutil.UpdateRecord(env, Country{}, func(db *sqlx.DB, validate *validator.Validate, id interface{}, byteData []byte) (interface{}, error) {
 		data := Country{}
 		json.Unmarshal(byteData, &data)
-		return UpdateCountry(db, id.(int), data)
+		return UpdateCountry(db, validate, id.(int), data)
 	})
 }
 

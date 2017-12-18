@@ -15,6 +15,7 @@ const MaxResults = 500
 const MaxOpenConns = 100
 const MaxIdleConns = 20
 
+// Return the postgresql connection
 func NewDB(datasourceName string) (*sqlx.DB, error) {
 	db, err := sqlx.Connect("postgres", datasourceName)
 	db.SetMaxIdleConns(MaxIdleConns)
@@ -26,9 +27,23 @@ func NewDB(datasourceName string) (*sqlx.DB, error) {
 	return db, nil
 }
 
+// Check for the provided value in the database records. Return true if found
 func IsExist(db *sqlx.DB, tbl string, col string, val interface{}) (bool, error) {
 	var count int
 	err := db.Get(&count, "SELECT COUNT(*) FROM "+tbl+" WHERE "+col+" = $1", val)
+	if err != nil {
+		return false, err
+	}
+	if count > 0 {
+		return true, nil
+	}
+	return false, nil
+}
+
+// Check for the provided value in the database records except the record specified by id. Return true if found
+func IsExistExcept(db *sqlx.DB, tbl string, id int, col string, val interface{}) (bool, error) {
+	var count int
+	err := db.Get(&count, "SELECT COUNT(*) FROM "+tbl+" WHERE id != $1 AND "+col+" = $2", id, val)
 	if err != nil {
 		return false, err
 	}
@@ -43,8 +58,8 @@ func Insert(db *sqlx.DB, tbl string, entity interface{}) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	var colBuff bytes.Buffer
-	var valBuff bytes.Buffer
+	colBuff := bytes.NewBufferString("")
+	valBuff := bytes.NewBufferString("")
 	colLen := len(cols)
 	for i := 1; i <= colLen; i++ {
 		colBuff.WriteString(cols[i-1])
@@ -72,7 +87,7 @@ func Update(db *sqlx.DB, tbl string, entity interface{}, query interface{}) erro
 	if err != nil {
 		return err
 	}
-	var colBuff bytes.Buffer
+	colBuff := bytes.NewBufferString("")
 	colLen := len(cols)
 	for i := 1; i <= colLen; i++ {
 		colBuff.WriteString(cols[i-1] + " = $" + strconv.Itoa(i))
@@ -80,7 +95,7 @@ func Update(db *sqlx.DB, tbl string, entity interface{}, query interface{}) erro
 			colBuff.WriteString(", ")
 		}
 	}
-	var qBuff bytes.Buffer
+	qBuff := bytes.NewBufferString("")
 	qcolLen := len(qcols)
 	for i := 1; i <= qcolLen; i++ {
 		qBuff.WriteString(qcols[i-1] + " = $" + strconv.Itoa(i+colLen))
@@ -132,6 +147,7 @@ func extractFields(entity interface{}, dbop string) ([]string, []interface{}, er
 		}
 
 		el := reflect.Indirect(ev.Elem().FieldByName(v.Name))
+		isString := false
 		if dbop == "u" || dbop == "q" {
 			// Skip if there is no value
 			if !el.IsValid() {
@@ -155,6 +171,8 @@ func extractFields(entity interface{}, dbop string) ([]string, []interface{}, er
 				if el.String() == "" {
 					continue
 				}
+				isString = true
+
 			default:
 				continue
 			}
@@ -167,7 +185,11 @@ func extractFields(entity interface{}, dbop string) ([]string, []interface{}, er
 		} else {
 			cols = append(cols, colname)
 		}
-		vals = append(vals, el.Interface())
+		if isString {
+			vals = append(vals, strings.TrimSpace(el.String()))
+		} else {
+			vals = append(vals, el.Interface())
+		}
 	}
 	if len(cols) <= 0 {
 		return nil, nil, errors.New("No eligible fields")

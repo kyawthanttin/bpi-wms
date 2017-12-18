@@ -4,13 +4,16 @@ import (
 	"errors"
 	"strconv"
 
+	"gopkg.in/go-playground/validator.v9"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/kyawthanttin/bpi-wms/dbutil"
+	"github.com/kyawthanttin/bpi-wms/validation"
 )
 
 type Category struct {
-	Id   int    `json:"id"`
-	Name string `json:"name" dbop:"iu"`
+	Id   int    `json:"id" validate:"-"`
+	Name string `json:"name" dbop:"iu" validate:"strmin=1,strmax=50,alphanumspecial"`
 }
 
 func ListCategories(db *sqlx.DB, search string) ([]Category, error) {
@@ -33,7 +36,10 @@ func GetCategory(db *sqlx.DB, id int) (Category, error) {
 	return result, err
 }
 
-func CreateCategory(db *sqlx.DB, data Category) (Category, error) {
+func CreateCategory(db *sqlx.DB, validate *validator.Validate, data Category) (Category, error) {
+	if err := validate.Struct(data); err != nil {
+		return Category{}, validation.DescribeErrors(err.(validator.ValidationErrors))
+	}
 	if exist, _ := dbutil.IsExist(db, "Category", "name", data.Name); exist {
 		return Category{}, errors.New("Same category already exists")
 	}
@@ -44,9 +50,15 @@ func CreateCategory(db *sqlx.DB, data Category) (Category, error) {
 	return GetCategory(db, id.(int))
 }
 
-func UpdateCategory(db *sqlx.DB, id int, data Category) (Category, error) {
+func UpdateCategory(db *sqlx.DB, validate *validator.Validate, id int, data Category) (Category, error) {
 	if exist, _ := dbutil.IsExist(db, "Category", "id", id); !exist {
 		return Category{}, errors.New("No such category")
+	}
+	if err := validate.Struct(data); err != nil {
+		return Category{}, validation.DescribeErrors(err.(validator.ValidationErrors))
+	}
+	if exist, _ := dbutil.IsExistExcept(db, "Category", id, "name", data.Name); exist {
+		return Category{}, errors.New("Same category already exists")
 	}
 	err := dbutil.Update(db, "Category", &data, &Category{Id: id})
 	if err != nil {

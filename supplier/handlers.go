@@ -7,6 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/kyawthanttin/bpi-wms/config"
 	"github.com/kyawthanttin/bpi-wms/webutil"
+	validator "gopkg.in/go-playground/validator.v9"
 )
 
 func SupplierList(env *config.Env) http.Handler {
@@ -22,18 +23,18 @@ func SupplierShow(env *config.Env) http.Handler {
 }
 
 func SupplierCreate(env *config.Env) http.Handler {
-	return webutil.CreateRecord(env, Supplier{}, func(db *sqlx.DB, byteData []byte) (interface{}, error) {
+	return webutil.CreateRecord(env, Supplier{}, func(db *sqlx.DB, validate *validator.Validate, byteData []byte) (interface{}, error) {
 		data := Supplier{}
 		json.Unmarshal(byteData, &data)
-		return CreateSupplier(db, data)
+		return CreateSupplier(db, validate, data)
 	})
 }
 
 func SupplierUpdate(env *config.Env) http.Handler {
-	return webutil.UpdateRecord(env, Supplier{}, func(db *sqlx.DB, id interface{}, byteData []byte) (interface{}, error) {
+	return webutil.UpdateRecord(env, Supplier{}, func(db *sqlx.DB, validate *validator.Validate, id interface{}, byteData []byte) (interface{}, error) {
 		data := Supplier{}
 		json.Unmarshal(byteData, &data)
-		return UpdateSupplier(db, id.(int), data)
+		return UpdateSupplier(db, validate, id.(int), data)
 	})
 }
 

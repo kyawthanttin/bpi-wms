@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"gopkg.in/go-playground/validator.v9"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/kyawthanttin/bpi-wms/config"
 	"github.com/kyawthanttin/bpi-wms/webutil"
@@ -22,18 +24,18 @@ func CategoryShow(env *config.Env) http.Handler {
 }
 
 func CategoryCreate(env *config.Env) http.Handler {
-	return webutil.CreateRecord(env, Category{}, func(db *sqlx.DB, byteData []byte) (interface{}, error) {
+	return webutil.CreateRecord(env, Category{}, func(db *sqlx.DB, validate *validator.Validate, byteData []byte) (interface{}, error) {
 		data := Category{}
 		json.Unmarshal(byteData, &data)
-		return CreateCategory(db, data)
+		return CreateCategory(db, validate, data)
 	})
 }
 
 func CategoryUpdate(env *config.Env) http.Handler {
-	return webutil.UpdateRecord(env, Category{}, func(db *sqlx.DB, id interface{}, byteData []byte) (interface{}, error) {
+	return webutil.UpdateRecord(env, Category{}, func(db *sqlx.DB, validate *validator.Validate, id interface{}, byteData []byte) (interface{}, error) {
 		data := Category{}
 		json.Unmarshal(byteData, &data)
-		return UpdateCategory(db, id.(int), data)
+		return UpdateCategory(db, validate, id.(int), data)
 	})
 }
 
