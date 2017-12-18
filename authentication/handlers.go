@@ -3,6 +3,7 @@ package authentication
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -11,11 +12,13 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/gorilla/context"
 
 	"github.com/kyawthanttin/bpi-wms/config"
-	"github.com/kyawthanttin/bpi-wms/user"
 	"github.com/kyawthanttin/bpi-wms/webutil"
 )
+
+const AdminRolename = "ADMIN"
 
 type JwtToken struct {
 	Token string `json:"token"`
@@ -27,7 +30,7 @@ func SignIn(env *config.Env) http.Handler {
 			webutil.RespondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
 			return
 		}
-		var data user.User
+		var data User
 		decoder := json.NewDecoder(r.Body)
 		if err := decoder.Decode(&data); err != nil {
 			webutil.RespondWithError(w, http.StatusBadRequest, "Invalid request payload")
@@ -35,7 +38,7 @@ func SignIn(env *config.Env) http.Handler {
 		}
 		defer r.Body.Close()
 
-		userInfo, err := user.GetUserByUsername(env.DB, data.Username)
+		userInfo, err := GetUserByUsername(env.DB, data.Username)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				webutil.RespondWithError(w, http.StatusNotFound, "Invalid username or password")
@@ -56,7 +59,7 @@ func SignIn(env *config.Env) http.Handler {
 			return
 		}
 
-		err = user.RecordLogin(env.DB, userInfo.Id)
+		err = RecordLogin(env.DB, userInfo.Id)
 		if err != nil {
 			webutil.RespondWithErrorType(w, err)
 		}
@@ -78,10 +81,6 @@ func SignIn(env *config.Env) http.Handler {
 }
 
 func Authenticate(env *config.Env, next http.Handler) http.Handler {
-	return AuthenticateWithRoles(env, next, nil)
-}
-
-func AuthenticateWithRoles(env *config.Env, next http.Handler, roles []string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var token string
 
@@ -117,7 +116,7 @@ func AuthenticateWithRoles(env *config.Env, next http.Handler, roles []string) h
 		if parsedToken != nil && parsedToken.Valid {
 			claims := parsedToken.Claims.(jwt.MapClaims)
 
-			userInfo, err := user.GetUserByUsername(env.DB, claims["username"].(string))
+			userInfo, err := GetUserByUsername(env.DB, claims["username"].(string))
 			if err != nil {
 				if err == sql.ErrNoRows {
 					webutil.RespondWithError(w, http.StatusNotFound, "The user may have been deleted")
@@ -132,22 +131,7 @@ func AuthenticateWithRoles(env *config.Env, next http.Handler, roles []string) h
 				return
 			}
 
-			if roles != nil {
-				userRoles := strings.Split(claims["roles"].(string), ",")
-				hasRole := false
-				for _, role := range roles {
-					for _, userRole := range userRoles {
-						if role == userRole {
-							hasRole = true
-							break
-						}
-					}
-				}
-				if !hasRole {
-					webutil.RespondWithError(w, http.StatusUnauthorized, "Insufficient Privilege")
-					return
-				}
-			}
+			context.Set(r, "UserInfo", userInfo)
 
 			// Token is valid.
 			next.ServeHTTP(w, r)
@@ -157,4 +141,45 @@ func AuthenticateWithRoles(env *config.Env, next http.Handler, roles []string) h
 		webutil.RespondWithError(w, http.StatusUnauthorized, err.Error())
 		return
 	})
+}
+
+// Check the userinfo retrieved from request token against the provided roles
+func CheckPrivilegeByRoles(r *http.Request, roles []string) error {
+	value, ok := context.GetOk(r, "UserInfo")
+	if !ok {
+		return errors.New("Cannot retrieve user info")
+	}
+	userInfo := value.(User)
+
+	if roles != nil {
+		userRoles := strings.Split(userInfo.Roles, ",")
+		hasRole := false
+		for _, role := range roles {
+			for _, userRole := range userRoles {
+				if role == userRole {
+					hasRole = true
+					break
+				}
+			}
+		}
+		if !hasRole {
+			return errors.New("Insufficient Privilege")
+		}
+	}
+
+	return nil
+}
+
+// Check the userinfo retrieved from request token against the provided id
+func CheckPrivilegeById(r *http.Request, id int) error {
+	value, ok := context.GetOk(r, "UserInfo")
+	if !ok {
+		return errors.New("Cannot retrieve user info")
+	}
+	userInfo := value.(User)
+
+	if userInfo.Id != id {
+		return errors.New("Insufficient Privilege")
+	}
+	return nil
 }

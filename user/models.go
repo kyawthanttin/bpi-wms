@@ -45,12 +45,6 @@ func GetUser(db *sqlx.DB, id int) (User, error) {
 	return result, err
 }
 
-func GetUserByUsername(db *sqlx.DB, username string) (User, error) {
-	result := User{}
-	err := db.Get(&result, "SELECT id, username, password, name, roles, is_enabled, created, last_login FROM Login_User WHERE username = $1", username)
-	return result, err
-}
-
 func CreateUser(db *sqlx.DB, validate *validator.Validate, data User) (User, error) {
 	if err := validate.Struct(data); err != nil {
 		return User{}, validation.DescribeErrors(err.(validator.ValidationErrors))
@@ -110,12 +104,4 @@ func ChangePassword(db *sqlx.DB, validate *validator.Validate, id int, password 
 		return User{}, err
 	}
 	return GetUser(db, id)
-}
-
-func RecordLogin(db *sqlx.DB, id int) error {
-	_, err := db.Exec("UPDATE Login_User SET last_login = $1 WHERE id = $2", time.Now(), id)
-	if err != nil {
-		return err
-	}
-	return nil
 }

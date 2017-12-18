@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/kyawthanttin/bpi-wms/validation"
+
 	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/gorilla/mux"
@@ -27,6 +29,13 @@ func RespondWithError(w http.ResponseWriter, code int, message string) {
 }
 
 func RespondWithErrorType(w http.ResponseWriter, err error) {
+	if err == nil {
+		return
+	}
+	if err, ok := err.(*validation.ErrorWithHttpStatus); ok {
+		RespondWithError(w, err.Status(), err.Error())
+		return
+	}
 	switch err {
 	case sql.ErrNoRows:
 		RespondWithError(w, http.StatusNotFound, "There is no such data")
@@ -35,13 +44,13 @@ func RespondWithErrorType(w http.ResponseWriter, err error) {
 	}
 }
 
-func ListRecords(env *config.Env, listFunc func(*sqlx.DB, interface{}) (interface{}, error)) http.Handler {
+func ListRecords(env *config.Env, listFunc func(http.ResponseWriter, *http.Request, *sqlx.DB, interface{}) (interface{}, error)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
 			RespondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
 			return
 		}
-		results, err := listFunc(env.DB, r.FormValue("search"))
+		results, err := listFunc(w, r, env.DB, r.FormValue("search"))
 		if err != nil {
 			RespondWithErrorType(w, err)
 			return
@@ -50,7 +59,7 @@ func ListRecords(env *config.Env, listFunc func(*sqlx.DB, interface{}) (interfac
 	})
 }
 
-func GetRecord(env *config.Env, getFunc func(*sqlx.DB, interface{}) (interface{}, error)) http.Handler {
+func GetRecord(env *config.Env, getFunc func(http.ResponseWriter, *http.Request, *sqlx.DB, interface{}) (interface{}, error)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
 			RespondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
@@ -63,7 +72,7 @@ func GetRecord(env *config.Env, getFunc func(*sqlx.DB, interface{}) (interface{}
 			return
 		}
 
-		result, err := getFunc(env.DB, id)
+		result, err := getFunc(w, r, env.DB, id)
 		if err != nil {
 			RespondWithErrorType(w, err)
 			return
@@ -72,7 +81,7 @@ func GetRecord(env *config.Env, getFunc func(*sqlx.DB, interface{}) (interface{}
 	})
 }
 
-func CreateRecord(env *config.Env, data interface{}, createFunc func(*sqlx.DB, *validator.Validate, []byte) (interface{}, error)) http.Handler {
+func CreateRecord(env *config.Env, data interface{}, createFunc func(http.ResponseWriter, *http.Request, *sqlx.DB, *validator.Validate, []byte) (interface{}, error)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			RespondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
@@ -85,7 +94,7 @@ func CreateRecord(env *config.Env, data interface{}, createFunc func(*sqlx.DB, *
 		}
 		defer r.Body.Close()
 		byteData, _ := json.Marshal(data)
-		created, err := createFunc(env.DB, env.Validate, byteData)
+		created, err := createFunc(w, r, env.DB, env.Validate, byteData)
 		if err != nil {
 			RespondWithErrorType(w, err)
 			return
@@ -94,7 +103,7 @@ func CreateRecord(env *config.Env, data interface{}, createFunc func(*sqlx.DB, *
 	})
 }
 
-func UpdateRecord(env *config.Env, data interface{}, updateFunc func(*sqlx.DB, *validator.Validate, interface{}, []byte) (interface{}, error)) http.Handler {
+func UpdateRecord(env *config.Env, data interface{}, updateFunc func(http.ResponseWriter, *http.Request, *sqlx.DB, *validator.Validate, interface{}, []byte) (interface{}, error)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "PUT" {
 			RespondWithError(w, http.StatusBadRequest, "Method Not Allowed")
@@ -113,7 +122,7 @@ func UpdateRecord(env *config.Env, data interface{}, updateFunc func(*sqlx.DB, *
 		}
 		defer r.Body.Close()
 		byteData, _ := json.Marshal(data)
-		updated, err := updateFunc(env.DB, env.Validate, id, byteData)
+		updated, err := updateFunc(w, r, env.DB, env.Validate, id, byteData)
 		if err != nil {
 			RespondWithErrorType(w, err)
 			return
@@ -122,7 +131,7 @@ func UpdateRecord(env *config.Env, data interface{}, updateFunc func(*sqlx.DB, *
 	})
 }
 
-func DeleteRecord(env *config.Env, deleteFunc func(*sqlx.DB, interface{}) error) http.Handler {
+func DeleteRecord(env *config.Env, deleteFunc func(http.ResponseWriter, *http.Request, *sqlx.DB, interface{}) error) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "DELETE" {
 			RespondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
@@ -134,7 +143,7 @@ func DeleteRecord(env *config.Env, deleteFunc func(*sqlx.DB, interface{}) error)
 			RespondWithError(w, http.StatusBadRequest, "Invalid Id")
 			return
 		}
-		if err := deleteFunc(env.DB, id); err != nil {
+		if err := deleteFunc(w, r, env.DB, id); err != nil {
 			RespondWithErrorType(w, err)
 			return
 		}
